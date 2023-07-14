@@ -7,12 +7,14 @@
  4. nessus agent
  #>
 
-
-
 # Variables
 # File source path; basically run this script and it will start naming stuff based on its location. 
 $sourcePath =(Split-Path -Path $MyInvocation.MyCommand.Path -Parent)+ "\"
 # Patching year/quarter (grabs date info to make a new folder when robocopying files. easier for manual cleanup
+# I agree with this idea, but for manual clean up it may be easier to always name the folder the same
+# ie. folder is always c:\remotepatch
+# your cleanup script can run every now and then on a timer and just search for that folder, if it exists you delete it
+
 $month = Get-Date -Format "MMMM"
 $year = Get-Date -Format "yyyy"
 switch ($month) {
@@ -24,7 +26,8 @@ switch ($month) {
 #Write-Host  $Q"Patching"$year
 
 # Get the list of all machines in the domain
-$computerList =(Get-ADComputer -Filter {(OperatingSystem -like "*Windows*") -and (Name -notlike "*dc*") -and (Name -notlike "*wac*")} | Select-Object -ExpandProperty Name )
+# Updated to remove the util machines from the original list
+$computerList =(Get-ADComputer -Filter {(OperatingSystem -like "*Windows*") -and (Name -notlike "*dc*") -and (Name -notlike "*wac*") -and (Name -notlike "*util*")} | Select-Object -ExpandProperty Name )
 #get separate list for the util machines to do the for loop for the server core machines
 $utilList =(Get-ADComputer -Filter {(OperatingSystem -like "*Windows*") -and (Name -like "*util*")} | Select-Object -ExpandProperty Name)
 
@@ -42,6 +45,8 @@ yes i know i need to do the copy part before installing
 and then when i go to actually execute on the server core machines, i think i need new pssession directly from the machine i am on to the server core, BUT
 i need to check if that is allowed since I usually just use "connect" from hyper-v
 
+When you say connect from hyper-v, is that because the server core machines do not have external exposure?
+ie. you can't touch them unless you are on the hypervisor?
 #>
 foreach ($computer in $utilList) {
 $scVM = (Get-VM | Where-Object { $_.Name -like "*DC*" -or $_.Name -like "*WAC*" }).Name
