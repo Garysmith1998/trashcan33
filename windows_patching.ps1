@@ -16,13 +16,13 @@ $sourcePath =(Split-Path -Path $MyInvocation.MyCommand.Path -Parent)+ "\"
 $month = Get-Date -Format "MMMM"
 $year = Get-Date -Format "yyyy"
 switch ($month) {
-    {"January", "February", "March" -contains $_} { $Q="Q1" }
-    {"April", "May", "June" -contains $_} { $Q="Q2" }
-    {"July", "August", "September" -contains $_} { $Q="Q3" }
-    {"October", "November", "December" -contains $_} { $Q="Q4" }
+        {"January", "February", "March" -contains $_} { $Q="Q1" }
+        {"April", "May", "June" -contains $_} { $Q="Q2" }
+        {"July", "August", "September" -contains $_} { $Q="Q3" }
+        {"October", "November", "December" -contains $_} { $Q="Q4" }
 }
-#Write-Host  $Q"Patching"$year
 
+#Write-Host  $Q"Patching"$year
 # Get the list of all machines in the domain
 $computerList =(Get-ADComputer -Filter {(OperatingSystem -like "*Windows*") -and (Name -notlike "*dc*") -and (Name -notlike "*wac*")} | Select-Object -ExpandProperty Name )
 #get separate list for the util machines to do the for loop for the server core machines
@@ -30,30 +30,44 @@ $utilList =(Get-ADComputer -Filter {(OperatingSystem -like "*Windows*") -and (Na
 
 #robocopy loop to windows machines using the folder name from the date
 foreach ($computer in $computerList) {
-Write-Host "Copying patches to $computer..."
-$destPath = ("\\" + $computer + "\C$\users\public\documents\" + $Q"Patching"$year + "\")
-robocopy $sourcePath $destPath /E /COPYALL }
+        Write-Host "Copying patches to $computer..."
+        $destPath = ("\\" + $computer + "\C$\users\public\documents\" + $Q+"Patching"+$year + "\")
+        robocopy $sourcePath $destPath /E /COPYALL 
+}
 <#
-
 server core help pls
 need to make sure setting allows remote copy AND execute in settings somewhere
 this part is a mess; i am using copy-vmfile bc i know it works but i think im murky on using invoke for the remote util to run it? 
 yes i know i need to do the copy part before installing
 and then when i go to actually execute on the server core machines, i think i need new pssession directly from the machine i am on to the server core, BUT
 i need to check if that is allowed since I usually just use "connect" from hyper-v
-
 #>
+
 foreach ($computer in $utilList) {
+        #connect to the host machine
+        # execute get-vm against clients
+                # remote ps-session to run the command
+                # for each vm returned execute the next commands
+                # report
+                # remove
+}
+
 $scVM = (Get-VM | Where-Object { $_.Name -like "*DC*" -or $_.Name -like "*WAC*" }).Name
         foreach ($computer in $scVM) {
-        $session = New-PSSession -ComputerName $computer
-        $installPath = "\C:\users\public\documents\" + $Q"Patching"$year + "\"
+                $tempname += ","+$computer  # needs to become a long string comma separated
+        }
+        
+        
+        {
+        $session = New-PSSession -ComputerName $tempname
+        $installPath = "\C:\users\public\documents\" + $Q+"Patching"+$year + "\"
         $kbPatch =($installPath + (Get-ChildItem -Path $destPath -Filter "*kb*.msu").Name)
         $defenderPatch =$installPath + (Get-ChildItem -Path $destPath -Filter "*mpam*.exe").Name
         $nessusPatch =$installPath + (Get-ChildItem -Path $destPath -Filter "*NessusAgent*.msi").Name
         $edgePatch =$installPath + (Get-ChildItem -Path $destPath -Filter "*Edge*.msi").Name
 <#copy to server core #>
-        Invoke-Command -Session $session -ScriptBlock { Copy-VMFile -Name $scVM -SourcePath $kbPatch -DestinationPath "C:\users\$env:USERNAME" -FileSource Host
+        Invoke-Command -Session $session -ScriptBlock { # rewritten as it will execute the block in sequence against each computer and doesnt need $scvm
+                Copy-VMFile -Name $scVM -SourcePath $kbPatch -DestinationPath "C:\users\$env:USERNAME" -FileSource Host
                                                         Copy-VMFile -Name $scVM -SourcePath $defenderPatch -DestinationPath "C:\users\$env:USERNAME" -FileSource Host
                                                         Copy-VMFile -Name $scVM -SourcePath $nessusPatch -DestinationPath "C:\users\$env:USERNAME" -FileSource Host
                                                         Copy-VMFile -Name $scVM -SourcePath $edgePatch -DestinationPath "C:\users\$env:USERNAME" -FileSource Host
@@ -69,7 +83,7 @@ $installPath would be local
 foreach ($computer in $computerList) {
 Write-Host "Installing patches on $computer..."
 
-$installPath = "\C:\users\public\documents\" + $Q"Patching"$year + "\"
+$installPath = "\C:\users\public\documents\" + $Q+"Patching"+$year + "\"
 
 $session = New-PSSession -ComputerName $computer
 #this looks at all the file names and gives them variables so i don't have to worry about crazy names (like copy of copy of etc.)
